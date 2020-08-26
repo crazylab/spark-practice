@@ -1,0 +1,8 @@
+.idea/
+app/
+target/
+project/project/
+project/target/
+spark-warehouse
+metastore_db
+src/main/resources/data/
