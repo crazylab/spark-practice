@@ -1,6 +1,6 @@
 package com.example
 
-import com.example.analysis.Employ
+import com.example.analysis.Employee
 import org.apache.spark.sql.{SparkSession, DataFrame, Row, Column}
 import org.apache.spark.sql.functions._
 
@@ -16,16 +16,16 @@ object SparkInternals {
   def main(args: Array[String]): Unit = {
     import spark.implicits._
     val employees = List(
-      Employ(id = 1, name = "John", salary = 5000, department = "sales", gender = "M"),
-      Employ(id = 2, name = "Jacob", salary = 10000, department = "HR", gender = "M"),
-      Employ(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F"),
-      Employ(id = 4, name = "Jackson", salary = 25000, department = "marketing", gender = "M"),
-      Employ(id = 5, name = "Anna", salary = 8000, department = "HR", gender = "F"),
-      Employ(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F"),
-      Employ(id = 7, name = "Devid", salary = 5000, department = "marketing", gender = "M"),
-      Employ(id = 8, name = "Peter", salary = 4000, department = "sales", gender = "M"),
-      Employ(id = 9, name = "Bob", salary = 3000, department = "marketing", gender = "M"),
-      Employ(id = 10, name = "Robin", salary = 7000, department = "marketing", gender = "F")
+      Employee(id = 1, name = "John", salary = 5000, department = "sales", gender = "M"),
+      Employee(id = 2, name = "Jacob", salary = 10000, department = "HR", gender = "M"),
+      Employee(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F"),
+      Employee(id = 4, name = "Jackson", salary = 25000, department = "marketing", gender = "M"),
+      Employee(id = 5, name = "Anna", salary = 8000, department = "HR", gender = "F"),
+      Employee(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F"),
+      Employee(id = 7, name = "Devid", salary = 5000, department = "marketing", gender = "M"),
+      Employee(id = 8, name = "Peter", salary = 4000, department = "sales", gender = "M"),
+      Employee(id = 9, name = "Bob", salary = 3000, department = "marketing", gender = "M"),
+      Employee(id = 10, name = "Robin", salary = 7000, department = "marketing", gender = "F")
     ).toDF
       .repartition(3)
       .cache()
@@ -40,33 +40,40 @@ object SparkInternals {
   }
 
   def makeNamesCapital(records: DataFrame): Unit = {
-    val toUpper: String => String = _.toUpperCase()
-    val toUpperUDF = udf(toUpper)
     import spark.implicits._
-    val capitalNames = records.select(toUpperUDF(col("name"))).as[String].collect().sorted
+    val toUpper: String => String = _.toUpperCase
+    val toUpperUDF = udf(toUpper)
+    val capitalNames = records.select(toUpperUDF($"name")).as[String].collect().sorted
 
     val expected = Array("JOHN", "JACOB", "JULIA", "JACKSON", "ANNA", "LINDA", "DEVID", "PETER", "BOB", "ROBIN").sorted
     assert(expected sameElements capitalNames, "Converting name to capital didn't work")
   }
 
   def convertGenderToBinary(records: DataFrame): Unit = {
-    val gendersInBinary = records.select(when(col("gender") === "M", 0)
-      .otherwise(1)
-      .as("gender"))
-
     import spark.implicits._
+    val gendersInBinary = records
+      .select(
+        when($"gender" === "M", 0)
+          .otherwise(1).as("gender")
+      )
+
     val expected = List(0, 0, 1, 0, 1, 1, 0, 0, 0, 1).toDF("gender")
 
     assert(gendersInBinary.exceptAll(expected).count() == 0, "Gender to binary conversion didn't match")
   }
 
   def convertToNamePipeDept(records: DataFrame): Unit = {
+    import spark.implicits._
     def toNamePipeDept(name: String, dept: String): String = s"$name | $dept"
 
     val namePipeDeptUDF = udf(toNamePipeDept _)
-    val nameAndDept = records.select(namePipeDeptUDF(col("name"), col("department")).as("name | dept"))
 
-    import spark.implicits._
+    val nameAndDept = records
+      .select(
+        namePipeDeptUDF($"name", $"department")
+          .as("name | dept")
+      )
+
     val expected = List(
       "Jackson | marketing",
       "Linda | HR",
@@ -83,14 +90,13 @@ object SparkInternals {
   }
 
   def convertRowToCSVUsingUDF(records: DataFrame): Unit = {
+    import spark.implicits._
     def toCsv(row: Row): String = row.mkString(",")
-
-    val csvUDF = udf(toCsv _)
+    val toCsvUDF = udf(toCsv _)
 
     val columns = records.columns.map(col)
-    val csvRecords = records.select(csvUDF(struct(columns: _*)).as("csvRecord"))
+    val csvRecords = records.select(toCsvUDF(struct(columns: _*)).as("csvRecord"))
 
-    import spark.implicits._
     val employees = List(
       "1,John,5000,sales,M",
       "2,Jacob,10000,HR,M",
@@ -125,16 +131,16 @@ object SparkInternals {
 
     import spark.implicits._
     val expected = List(
-      Employ(id = 1, name = "J", salary = 5000, department = "sales", gender = "M"),
-      Employ(id = 2, name = "Jay", salary = 10000, department = "HR", gender = "M"),
-      Employ(id = 3, name = "Jul", salary = 1000, department = "sales", gender = "F"),
-      Employ(id = 4, name = "Jack", salary = 25000, department = "marketing", gender = "M"),
-      Employ(id = 5, name = "Ann", salary = 8000, department = "HR", gender = "F"),
-      Employ(id = 6, name = "Lin", salary = 12000, department = "HR", gender = "F"),
-      Employ(id = 7, name = "Dev", salary = 5000, department = "marketing", gender = "M"),
-      Employ(id = 8, name = "Pete", salary = 4000, department = "sales", gender = "M"),
-      Employ(id = 9, name = "No Nick Name", salary = 3000, department = "marketing", gender = "M"),
-      Employ(id = 10, name = "Rob", salary = 7000, department = "marketing", gender = "F")
+      Employee(id = 1, name = "J", salary = 5000, department = "sales", gender = "M"),
+      Employee(id = 2, name = "Jay", salary = 10000, department = "HR", gender = "M"),
+      Employee(id = 3, name = "Jul", salary = 1000, department = "sales", gender = "F"),
+      Employee(id = 4, name = "Jack", salary = 25000, department = "marketing", gender = "M"),
+      Employee(id = 5, name = "Ann", salary = 8000, department = "HR", gender = "F"),
+      Employee(id = 6, name = "Lin", salary = 12000, department = "HR", gender = "F"),
+      Employee(id = 7, name = "Dev", salary = 5000, department = "marketing", gender = "M"),
+      Employee(id = 8, name = "Pete", salary = 4000, department = "sales", gender = "M"),
+      Employee(id = 9, name = "No Nick Name", salary = 3000, department = "marketing", gender = "M"),
+      Employee(id = 10, name = "Rob", salary = 7000, department = "marketing", gender = "F")
     ).toDF
 
     assert(employesWithNickName.exceptAll(expected).count() == 0, "Employ with nick name didn't match")

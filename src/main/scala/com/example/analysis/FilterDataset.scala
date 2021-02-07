@@ -14,16 +14,16 @@ object FilterDataset {
   def main(args: Array[String]): Unit = {
     import spark.implicits._
     val employees = List(
-      Employ(id = 1, name = "John", salary = 5000, department = "sales", gender = "M"),
-      Employ(id = 2, name = "Jacob", salary = 10000, department = "HR", gender = "M"),
-      Employ(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F"),
-      Employ(id = 4, name = "Jackson", salary = 25000, department = "marketing", gender = "M"),
-      Employ(id = 5, name = "Anna", salary = 8000, department = "HR", gender = "F"),
-      Employ(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F"),
-      Employ(id = 7, name = "Devid", salary = 5000, department = "marketing", gender = "M"),
-      Employ(id = 8, name = "Peter", salary = 4000, department = "sales", gender = "M"),
-      Employ(id = 9, name = "Bob", salary = 3000, department = "marketing", gender = "M"),
-      Employ(id = 10, name = "Robin", salary = 7000, department = "marketing", gender = "F")
+      Employee(id = 1, name = "John", salary = 5000, department = "sales", gender = "M"),
+      Employee(id = 2, name = "Jacob", salary = 10000, department = "HR", gender = "M"),
+      Employee(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F"),
+      Employee(id = 4, name = "Jackson", salary = 25000, department = "marketing", gender = "M"),
+      Employee(id = 5, name = "Anna", salary = 8000, department = "HR", gender = "F"),
+      Employee(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F"),
+      Employee(id = 7, name = "Devid", salary = 5000, department = "marketing", gender = "M"),
+      Employee(id = 8, name = "Peter", salary = 4000, department = "sales", gender = "M"),
+      Employee(id = 9, name = "Bob", salary = 3000, department = "marketing", gender = "M"),
+      Employee(id = 10, name = "Robin", salary = 7000, department = "marketing", gender = "F")
     ).toDF.cache()
 
     findEmployeesWithNameStartingWithJ(employees)
@@ -50,10 +50,10 @@ object FilterDataset {
     import spark.implicits._
     val employ = dataset
       .where($"name" === "Julia")
-      .as[Employ]
+      .as[Employee]
       .first()
 
-    val julia = Employ(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F")
+    val julia = Employee(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F")
     assert(employ == julia, "The filtered employ didn't match")
   }
 
@@ -70,25 +70,33 @@ object FilterDataset {
   }
 
   def findEmployeesWhoAreFemaleAndEarningMoreThan8000(records: DataFrame): Unit = {
-    val filteredRecordCount = records.where(col("salary") > 8000 and col("gender") === "F").count()
+    import spark.implicits._
+    val filteredRecordCount = records.where($"gender" === "F" and $"salary" > 8000).count()
 
     assert(filteredRecordCount == 1, "Number of female employ earning more than 8000 didn't match")
   }
 
   def findEmployWithMinimumSalary(records: DataFrame): Unit = {
-    val minSalary = records.select(min("salary").as("min_salary")).first().getAs[Int]("min_salary")
+    val minSalary = records
+      .select(min("salary").as("minSalary"))
+      .first()
+      .getAs[Int]("minSalary")
 
     import spark.implicits._
-    val employWithMinSalary = records.where(col("salary") === minSalary).as[Employ].first()
-    val julia = Employ(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F")
+    val employeeWithMinSalary = records
+      .where($"salary" === minSalary)
+      .as[Employee]
+      .first()
 
-    assert(employWithMinSalary == julia, "Employ with minimum salary din't match")
+    val julia = Employee(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F")
+    assert(employeeWithMinSalary == julia, "Employ with minimum salary din't match")
   }
 
   def findEmployeesWithMissingSalaryInformation(records: DataFrame): Unit = {
     val numberOfEmployeesWithMissingSalary = records.where(col("salary").isNull).count()
+
     assert(numberOfEmployeesWithMissingSalary == 0, "Number of employees with missing salary did not match")
   }
 }
 
-case class Employ(id: Int, name: String, salary: Int, department: String, gender: String)
+case class Employee(id: Int, name: String, salary: Int, department: String, gender: String)

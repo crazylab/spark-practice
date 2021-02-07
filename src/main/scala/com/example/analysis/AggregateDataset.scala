@@ -15,16 +15,16 @@ object AggregateDataset {
   def main(args: Array[String]): Unit = {
     import spark.implicits._
     val employees = List(
-      Employ(id = 1, name = "John", salary = 5000, department = "sales", gender = "M"),
-      Employ(id = 2, name = "Jacob", salary = 10000, department = "HR", gender = "M"),
-      Employ(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F"),
-      Employ(id = 4, name = "Jackson", salary = 25000, department = "marketing", gender = "M"),
-      Employ(id = 5, name = "Anna", salary = 8000, department = "HR", gender = "F"),
-      Employ(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F"),
-      Employ(id = 7, name = "Devid", salary = 5000, department = "marketing", gender = "M"),
-      Employ(id = 8, name = "Peter", salary = 4000, department = "sales", gender = "M"),
-      Employ(id = 9, name = "Bob", salary = 3000, department = "marketing", gender = "M"),
-      Employ(id = 10, name = "Robin", salary = 7000, department = "marketing", gender = "F")
+      Employee(id = 1, name = "John", salary = 5000, department = "sales", gender = "M"),
+      Employee(id = 2, name = "Jacob", salary = 10000, department = "HR", gender = "M"),
+      Employee(id = 3, name = "Julia", salary = 1000, department = "sales", gender = "F"),
+      Employee(id = 4, name = "Jackson", salary = 25000, department = "marketing", gender = "M"),
+      Employee(id = 5, name = "Anna", salary = 8000, department = "HR", gender = "F"),
+      Employee(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F"),
+      Employee(id = 7, name = "Devid", salary = 5000, department = "marketing", gender = "M"),
+      Employee(id = 8, name = "Peter", salary = 4000, department = "sales", gender = "M"),
+      Employee(id = 9, name = "Bob", salary = 3000, department = "marketing", gender = "M"),
+      Employee(id = 10, name = "Robin", salary = 7000, department = "marketing", gender = "F")
     ).toDF
       .repartition(3)
       .cache()
@@ -41,16 +41,15 @@ object AggregateDataset {
 
   def averageSalary(records: DataFrame): Unit = {
     val averageSalary = records
-      .select(avg("salary").as("avg_salary"))
+      .select(avg("salary").as("avgSalary"))
       .first()
-      .getAs[Double]("avg_salary")
-
+      .getAs[Double]("avgSalary")
 
     assert(averageSalary == 8000, "Average salary didn't match")
   }
 
   def averageSalaryPerDept(records: DataFrame): Unit = {
-    val averageSalaryPerDept = records.groupBy("department").avg("salary").as("avg_salary")
+    val averageSalaryPerDept = records.groupBy("department").avg("salary").as("average_salary")
 
     import spark.implicits._
     val expected = (("HR", 10000.0) :: ("marketing", 10000.0) :: ("sales", 3333.3333333333335) :: Nil)
@@ -74,15 +73,16 @@ object AggregateDataset {
   }
 
   def secondHighestEarningEmployee(records: DataFrame): Unit = {
-    val orderBySalary = Window.orderBy(col("salary").desc)
     import spark.implicits._
-    val columns = records.columns
-    val employWithSecondHighestSalary = records.withColumn("salary_rank", rank().over(orderBySalary))
-      .where(col("salary_rank") === 2)
-      .select(columns.head, columns.tail: _*).as[Employ]
+    val orderBySalary = Window.orderBy($"salary".desc)
+    val employWithSecondHighestSalary = records
+      .withColumn("rank", dense_rank().over(orderBySalary))
+      .where($"rank" === 2)
+      .drop("rank")
+      .as[Employee]
       .first()
 
-    val linda = Employ(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F")
+    val linda = Employee(id = 6, name = "Linda", salary = 12000, department = "HR", gender = "F")
     assert(linda == employWithSecondHighestSalary, "Employ with second highest salary didn't match")
   }
 
@@ -104,8 +104,8 @@ object AggregateDataset {
       """This text is for word count
         |This will count number of word""".stripMargin
     val textDF = text.split("\n").toList.toDF("text")
-    val wordArray = split(col("text"), " ")
 
+    val wordArray = split(col("text"), " ")
     val wordCount = textDF.select(explode(wordArray).as("words"))
       .groupBy(lower(col("words").as("word"))).count()
 
@@ -123,6 +123,5 @@ object AggregateDataset {
       .toDF("word", "count")
 
     assert(expected.exceptAll(wordCount).count() == 0, "Word count didn't match")
-
   }
 }
